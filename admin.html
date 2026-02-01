@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #333;
+      min-height: 100vh;
+    }
+    header {
+      background: #2c2c2c;
+      color: #fff;
+      padding: 18px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 1.3rem; }
+    header .info { font-size: 0.82rem; color: #aaa; }
+    header button {
+      background: #555;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+    header button:hover { background: #777; }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 16px 28px;
+      background: #fff;
+      border-bottom: 1px solid #eee;
+    }
+    .tabs button {
+      padding: 8px 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .tabs button.active {
+      background: #2c2c2c;
+      color: #fff;
+      border-color: #2c2c2c;
+    }
+
+    .panel { display: none; padding: 24px 28px; max-width: 800px; margin: 0 auto; }
+    .panel.active { display: block; }
+
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .form-row input, .form-row select {
+      flex: 1;
+      min-width: 140px;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .form-row input:focus, .form-row select:focus { border-color: #2c2c2c; }
+    .form-row button {
+      padding: 10px 22px;
+      background: #2c2c2c;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: background 0.2s;
+    }
+    .form-row button:hover { background: #444; }
+
+    #message {
+      padding: 8px 0;
+      font-size: 0.85rem;
+      min-height: 24px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    th {
+      background: #2c2c2c;
+      color: #fff;
+      padding: 11px 14px;
+      text-align: left;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 11px 14px;
+      border-bottom: 1px solid #eee;
+      font-size: 0.88rem;
+    }
+    tr:last-child td { border-bottom: none; }
+    .delete-btn {
+      background: #e44;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 0.78rem;
+    }
+    .delete-btn:hover { background: #c33; }
+    .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 12px; color: #2c2c2c; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>⚙️ Admin Panel</h1>
+      <span class="info" id="roleInfo">Checking access...</span>
+    </div>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <div class="tabs">
+    <button class="active" onclick="switchPanel('categories', this)">Categories</button>
+    <button onclick="switchPanel('dishes', this)">Dishes</button>
+  </div>
+
+  <!-- CATEGORIES PANEL -->
+  <div id="categoriesPanel" class="panel active">
+    <div class="section-title">Manage Categories</div>
+    <div class="form-row">
+      <input type="text" id="catName" placeholder="Category name" />
+      <input type="text" id="catDesc" placeholder="Description (optional)" />
+      <button onclick="createCategory()">+ Add</button>
+    </div>
+    <div id="catMessage"></div>
+    <table>
+      <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+      <tbody id="catBody"></tbody>
+    </table>
+  </div>
+
+  <!-- DISHES PANEL -->
+  <div id="dishesPanel" class="panel">
+    <div class="section-title">Manage Dishes</div>
+    <div class="form-row">
+      <input type="text" id="dishName" placeholder="Dish name" />
+      <input type="text" id="dishDesc" placeholder="Description" />
+      <input type="number" id="dishPrice" placeholder="Price" min="0" step="0.01" />
+      <select id="dishCategory"></select>
+      <button onclick="createDish()">+ Add</button>
+    </div>
+    <div id="dishMessage"></div>
+    <table>
+      <thead><tr><th>Name</th><th>Category</th><th>Price</th><th></th></tr></thead>
+      <tbody id="dishBody"></tbody>
+    </table>
+  </div>
+
+  <script src="script.js"></script>
+  <script>
+    let categories = [];
+
+    // ── Check if user is admin ──────────────
+    function checkAccess() {
+      const token = localStorage.getItem("token");
+      const role = localStorage.getItem("role");
+      if (!token || role !== "admin") {
+        document.getElementById("roleInfo").textContent = "❌ Admin access required";
+        document.getElementById("roleInfo").style.color = "#e44";
+        return false;
+      }
+      document.getElementById("roleInfo").textContent = `✅ Logged in as admin`;
+      document.getElementById("roleInfo").style.color = "#2a9d5c";
+      return true;
+    }
+
+    function getHeaders() {
+      return {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      };
+    }
+
+    function switchPanel(panel, btn) {
+      document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("categoriesPanel").classList.toggle("active", panel === "categories");
+      document.getElementById("dishesPanel").classList.toggle("active", panel === "dishes");
+    }
+
+    function logout() {
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      window.location.href = "login.html";
+    }
+
+    // ──────────── CATEGORIES ────────────────
+    async function loadCategories() {
+      const res = await fetch("/api/categories");
+      categories = await res.json();
+      renderCategories();
+      fillCategorySelect();
+    }
+
+    function renderCategories() {
+      const tbody = document.getElementById("catBody");
+      tbody.innerHTML = categories.map(c => `
+        <tr>
+          <td>${c.name}</td>
+          <td>${c.description || "—"}</td>
+          <td><button class="delete-btn" onclick="deleteCategory('${c._id}')">Delete</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function fillCategorySelect() {
+      const sel = document.getElementById("dishCategory");
+      sel.innerHTML = '<option value="">— Category —</option>' +
+        categories.map(c => `<option value="${c._id}">${c.name}</option>`).join("");
+    }
+
+    async function createCategory() {
+      const name = document.getElementById("catName").value.trim();
+      const description = document.getElementById("catDesc").value.trim();
+      const msg = document.getElementById("catMessage");
+      if (!name) { msg.style.color = "#e44"; msg.textContent = "Name is required"; return; }
+
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ name, description }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        msg.style.color = "#2a9d5c";
+        msg.textContent = "✅ Category created";
+        document.getElementById("catName").value = "";
+        document.getElementById("catDesc").value = "";
+        loadCategories();
+      } else {
+        msg.style.color = "#e44";
+        msg.textContent = data.message;
+      }
+    }
+
+    async function deleteCategory(id) {
+      if (!confirm("Delete this category?")) return;
+      const res = await fetch(`/api/categories/${id}`, { method: "DELETE", headers: getHeaders() });
+      if (res.ok) loadCategories();
+    }
+
+    // ──────────── DISHES ────────────────────
+    async function loadDishes() {
+      const res = await fetch("/api/dishes");
+      const dishes = await res.json();
+      renderDishes(dishes);
+    }
+
+    function renderDishes(dishes) {
+      const tbody = document.getElementById("dishBody");
+      tbody.innerHTML = dishes.map(d => `
+        <tr>
+          <td>${d.name}</td>
+          <td>${d.category?.name || "—"}</td>
+          <td>$${d.price.toFixed(2)}</td>
+          <td><button class="delete-btn" onclick="deleteDish('${d._id}')">Delete</button></td>
+        </tr>
+      `).join("");
+    }
+
+    async function createDish() {
+      const name = document.getElementById("dishName").value.trim();
+      const description = document.getElementById("dishDesc").value.trim();
+      const price = document.getElementById("dishPrice").value;
+      const category = document.getElementById("dishCategory").value;
+      const msg = document.getElementById("dishMessage");
+
+      if (!name || !description || !price || !category) {
+        msg.style.color = "#e44";
+        msg.textContent = "Fill in all fields";
+        return;
+      }
+
+      const res = await fetch("/api/dishes", {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify({ name, description, price: parseFloat(price), category }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        msg.style.color = "#2a9d5c";
+        msg.textContent = "✅ Dish created";
+        document.getElementById("dishName").value = "";
+        document.getElementById("dishDesc").value = "";
+        document.getElementById("dishPrice").value = "";
+        document.getElementById("dishCategory").value = "";
+        loadDishes();
+      } else {
+        msg.style.color = "#e44";
+        msg.textContent = data.message;
+      }
+    }
+
+    async function deleteDish(id) {
+      if (!confirm("Delete this dish?")) return;
+      const res = await fetch(`/api/dishes/${id}`, { method: "DELETE", headers: getHeaders() });
+      if (res.ok) loadDishes();
+    }
+
+    // ── Init ────────────────────────────────
+    if (checkAccess()) {
+      loadCategories();
+      loadDishes();
+    }
+  </script>
+</body>
+</html>
